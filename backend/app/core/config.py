@@ -23,10 +23,7 @@ class Settings(BaseSettings):
        extra = "ignore"
    )
    
-  
-       
-   
 settings = Settings()
 
-def get_upload_path() -> Path:
+def get_upload_directory() -> Path:
     return Path(settings.upload_directory)

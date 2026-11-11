@@ -11,7 +11,8 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "pydantic-settings",
-    "sqlalchemy"
+    "sqlalchemy",
+    "python-multipart"
 ]
 
 [project.optional-dependencies]
