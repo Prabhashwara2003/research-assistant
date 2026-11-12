@@ -9,6 +9,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.config import get_upload_directory
 from app.core.database import Base, get_db
+from app.models.document_image import DocumentImage
 from app.routers.document_router import router as document_router
 
 import app.models
@@ -174,3 +175,32 @@ def test_get_original_pdf(client):
     assert response.status_code == 200
     assert response.content == pdf_content
     assert response.headers["content-type"] == "application/pdf"
+
+
+def test_get_document_image(client, tmp_path):
+    upload_response = client.post(
+        "/api/documents",
+        files={"file": ("paper.pdf", b"%PDF-1.4\nTest", "application/pdf")}
+    )
+    document_id = upload_response.json()["id"]
+    image_id = f"{document_id}_p1_img1"
+    image_path = tmp_path / "image.png"
+    image_path.write_bytes(b"test image")
+
+    database_generator = client.app.dependency_overrides[get_db]()
+    database = next(database_generator)
+    try:
+        database.add(DocumentImage(
+            image_id=image_id,
+            document_id=document_id,
+            page_number=1,
+            file_path=str(image_path)
+        ))
+        database.commit()
+    finally:
+        database_generator.close()
+
+    response = client.get(f"/api/documents/{document_id}/images/{image_id}")
+
+    assert response.status_code == 200
+    assert response.content == b"test image"

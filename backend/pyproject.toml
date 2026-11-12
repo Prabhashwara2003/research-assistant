@@ -12,7 +12,15 @@ dependencies = [
     "uvicorn[standard]",
     "pydantic-settings",
     "sqlalchemy",
-    "python-multipart"
+    "python-multipart",
+    "langchain-core",
+    "langchain-text-splitters",
+    "langchain-anthropic",
+    "langchain-huggingface",
+    "sentence-transformers",
+    "langfuse",
+    "docling[vlm]",
+    "pillow"
 ]
 
 [project.optional-dependencies]

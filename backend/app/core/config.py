@@ -18,6 +18,14 @@ class Settings(BaseSettings):
    
    upload_directory : str = "storage/uploads"
    
+   chunk_size : int = 1000
+   chunk_overlap : int = 150
+   retrieval_k : int= 5
+   max_pdf_pages : int= 50
+   
+   enable_picture_description : bool = False
+   picture_model : str = "HuggingFaceTB/SmolVLM-500M-Instruct"
+   
    model_config = SettingsConfigDict(
        env_file = ".env",
        extra = "ignore"
