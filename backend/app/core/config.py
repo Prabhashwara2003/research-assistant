@@ -5,7 +5,7 @@ class Settings(BaseSettings):
    
    database_url : str = "sqlite:///./storage/research.db"
    
-   anthropic_value : str =""
+   anthropic_api_key : str =""
    claude_model : str =""
    
    langfuse_secret_key :str =""
@@ -17,6 +17,7 @@ class Settings(BaseSettings):
    max_pdf_size_mb :int =20
    
    upload_directory : str = "storage/uploads"
+   extracted_directory : str = "storage/uploads/images"
    
    chunk_size : int = 1000
    chunk_overlap : int = 150

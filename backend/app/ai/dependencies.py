@@ -12,6 +12,11 @@ from app.ai.text_chuncker import TextChunker
 from app.ai.embedding_provider import EmbeddingProvider
 from app.ai.vector_store import VectorStoreManager
 
+from langchain_core.language_models import BaseChatModel
+from app.ai.llm_provider import LLMProvider
+from app.ai.summary_generator import SummaryGenerator
+from app.services.summary_service import SummaryService
+
 from app.services.document_processing_service import (
     
     DocumentProcessingService
@@ -51,3 +56,36 @@ def get_documents_processor(
             settings.extracted_directory
         )
     )
+
+@lru_cache
+def get_chat_model()->BaseChatModel:
+    
+    if not settings.anthropic_api_key:
+        raise ValueError(
+            "Anthropic key is not configured"
+        )
+    if not settings.claude_model:
+        raise ValueError(
+            "Claude model isnot configured"
+        )
+        
+    provider = LLMProvider(
+        api_key=settings.anthropic_api_key,
+        model_name=settings.claude_model
+    )
+    
+    return provider.create_model()
+
+def get_Summary_service(
+        database : Session = Depends(get_db)
+    )->SummaryService:
+        generator = SummaryGenerator(
+            model = get_chat_model()
+        )
+        
+        return SummaryService(
+            database=database,
+            summary_generator=generator,
+            extracted_directory=Path(settings.extracted_directory)
+        )
+    

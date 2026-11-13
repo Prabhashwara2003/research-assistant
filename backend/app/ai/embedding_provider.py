@@ -10,7 +10,7 @@ class EmbeddingProvider:
         embeddings = HuggingFaceEmbeddings(
             model_name = self.model_name,
             encode_kwargs={
-                "normalize_embedding" : True
+                "normalize_embeddings" : True
             }
         )
         

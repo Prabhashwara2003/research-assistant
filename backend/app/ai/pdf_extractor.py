@@ -76,7 +76,7 @@ class DoclingPDFExtractor :
         
         options = PdfPipelineOptions()
         
-        options.image_scale = 2.0
+        options.images_scale = 2.0
         options.generate_picture_images = True
         options.do_picture_classification = True
         options.do_chart_extraction = False

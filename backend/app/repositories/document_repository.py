@@ -41,3 +41,13 @@ class DocumentRepository:
         document.status = status
         
         self.database.commit()
+        
+    def save_summary(
+        self,
+        document : Document,
+        summary_json : str
+    )-> None:
+        document.summary_json = summary_json
+        document.status = "completed"
+        
+        self.database.commit()

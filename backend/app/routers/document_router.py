@@ -1,5 +1,6 @@
 
 from pathlib import Path
+import logging
 from fastapi import HTTPException
 from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import FileResponse
@@ -9,16 +10,19 @@ from app.core.config import get_upload_directory
 from app.core.database import get_db
 from app.schemas.document_schema import DocumentResponse
 from app.services.document_service import DocumentService
-from app.ai.dependencies import get_documents_processor
+from app.ai.dependencies import get_documents_processor,get_Summary_service
 from app.services.document_processing_service import (
     DocumentProcessingService
 )
 from app.repositories.image_repository import ImageRepository
+from app.schemas.summary_schema import ResearchSummary
+from app.services.summary_service import SummaryService
 
 router = APIRouter(
     prefix="/api/documents",
     tags=["Documents"]
 )
+logger = logging.getLogger(__name__)
 
 
 @router.post(
@@ -111,6 +115,7 @@ def process_document(
             detail=str(error)
         )
     except Exception:
+        logger.exception("Document processing failed for %s", document_id)
         raise HTTPException(
             status_code=500,
             detail="Document processing failed"
@@ -145,3 +150,60 @@ def get_document_image(
         path=image_path,
         media_type="image/png"
     )
+
+@router.get("/{document_id}/images")
+def get_images_by_document(
+    document_id :str,
+    database : Session= Depends(get_db)
+):
+    images = ImageRepository(database).get_by_document(document_id=document_id)
+
+    return images
+
+@router.post(
+    "/{document_id}/summary",
+    response_model=ResearchSummary
+    )
+def generate_document_summary(
+    document_id : str,
+    service :  SummaryService= Depends(get_Summary_service),
+    database : Session = Depends(get_db)
+):
+    try:
+        return service.generate_summary(document_id)
+    
+    except ValueError as error:
+        raise HTTPException(
+            status_code=409,
+            detail=str(error)
+        )
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="Extracted document not found"
+        )
+        
+@router.get(
+    "/{document_id}/summary",
+    response_model=ResearchSummary
+)
+def get_document_summary(
+    document_id : str,
+    service : SummaryService = Depends(
+        get_Summary_service
+    )
+):
+    try :
+        Summary = service.get_summary(document_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=404,
+            detail = "Documents not found"
+        )
+    if Summary is None:
+        raise HTTPException(
+            status_code=404,
+            detail="summary has not been generated"
+        )
+        
+    return Summary
