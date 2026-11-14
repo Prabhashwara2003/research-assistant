@@ -17,6 +17,12 @@ from app.ai.llm_provider import LLMProvider
 from app.ai.summary_generator import SummaryGenerator
 from app.services.summary_service import SummaryService
 
+from app.ai.index_recovery import IndexRecoveryService
+from app.ai.rag_retriever import RAGRetriever
+from app.ai.answer_generator import AnswerGenerator
+
+from app.services.chat_service import ChatService
+
 from app.services.document_processing_service import (
     
     DocumentProcessingService
@@ -89,3 +95,38 @@ def get_Summary_service(
             extracted_directory=Path(settings.extracted_directory)
         )
     
+@lru_cache
+def get_index_recovery()-> IndexRecoveryService:
+    
+    return IndexRecoveryService(
+        vector_store=get_vector_store_manager(),
+        extractor=get_extractor(),
+        chunker=TextChunker(
+            chunk_size=settings.chunk_size,
+            chunk_overlap=settings.chunk_overlap
+        ),
+        extracted_directory=Path(
+            settings.extracted_directory
+        )
+    )
+
+def get_chat_service(
+    database : Session = Depends(get_db)
+)->ChatService:
+    retriever = RAGRetriever(
+        vector_store = get_vector_store_manager(),
+        index_recovery = get_index_recovery(),
+        retrieval_k = settings.retrieval_k
+    )
+    
+    answer_generator = AnswerGenerator(
+        model=get_chat_model()
+    )
+
+    return ChatService(
+        database=database,
+        retriever=retriever,
+        answer_generator=answer_generator,
+        history_limit=settings.chat_history_limit,
+        max_images=settings.max_images_per_answer
+    )

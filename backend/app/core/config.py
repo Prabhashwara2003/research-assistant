@@ -24,6 +24,10 @@ class Settings(BaseSettings):
    retrieval_k : int= 5
    max_pdf_pages : int= 50
    
+   chat_history_limit: int = 8
+   max_images_per_answer: int = 2
+   max_question_length: int = 2000
+   
    enable_picture_description : bool = False
    picture_model : str = "HuggingFaceTB/SmolVLM-500M-Instruct"
    

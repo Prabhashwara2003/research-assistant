@@ -109,6 +109,27 @@ class DocumentProcessingService:
                     
                 chunks = self.chunker.split(result.documents)
                 
+                chunk_records = []
+                
+                for chunk in chunks:
+                    chunk_records.append({
+                        "content":chunk.page_content,
+                        "metadata":chunk.metadata
+                    })
+                    
+                chunks_path = (
+                    working_directory/"chunks.json"
+                )
+                
+                chunks_path.write_text(
+                    json.dumps(
+                        chunk_records,
+                        ensure_ascii=False,
+                        indent = 2
+                    ),
+                    encoding = "utf-8"
+                )
+                
                 if not chunks:
                     raise ValueError("No searchable chunks were created")
                 
