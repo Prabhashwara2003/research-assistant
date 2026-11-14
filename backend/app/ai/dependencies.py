@@ -28,6 +28,10 @@ from app.services.document_processing_service import (
     DocumentProcessingService
 ) 
 
+from app.core.observability import Observability
+from app.core.chat_locks import ChatLockManager
+from app.core.exceptions import AnswerGenerationError
+
 @lru_cache
 def get_extractor()->DoclingPDFExtractor:
     return DoclingPDFExtractor(
@@ -60,18 +64,19 @@ def get_documents_processor(
         vector_store=get_vector_store_manager(),
         extracted_directory=Path(
             settings.extracted_directory
-        )
+        ),
+        observability=get_observability()
     )
 
 @lru_cache
 def get_chat_model()->BaseChatModel:
     
     if not settings.anthropic_api_key:
-        raise ValueError(
+        raise AnswerGenerationError(
             "Anthropic key is not configured"
         )
     if not settings.claude_model:
-        raise ValueError(
+        raise AnswerGenerationError(
             "Claude model isnot configured"
         )
         
@@ -86,13 +91,15 @@ def get_Summary_service(
         database : Session = Depends(get_db)
     )->SummaryService:
         generator = SummaryGenerator(
-            model = get_chat_model()
+            model = get_chat_model(),
+            observability=get_observability()
         )
         
         return SummaryService(
             database=database,
             summary_generator=generator,
-            extracted_directory=Path(settings.extracted_directory)
+            extracted_directory=Path(settings.extracted_directory),
+            observability=get_observability()
         )
     
 @lru_cache
@@ -120,7 +127,8 @@ def get_chat_service(
     )
     
     answer_generator = AnswerGenerator(
-        model=get_chat_model()
+        model=get_chat_model(),
+        observability=get_observability()
     )
 
     return ChatService(
@@ -128,5 +136,21 @@ def get_chat_service(
         retriever=retriever,
         answer_generator=answer_generator,
         history_limit=settings.chat_history_limit,
-        max_images=settings.max_images_per_answer
+        max_images=settings.max_images_per_answer,
+        observability=get_observability(),
+        chat_locks=get_chat_locks()
     )
+
+@lru_cache
+def get_observability() -> Observability:
+
+    return Observability(
+        enabled=settings.langfuse_enabled,
+        public_key=settings.langfuse_public_key,
+        secret_key=settings.langfuse_secret_key,
+        base_url=settings.langfuse_base_url
+    )
+
+@lru_cache
+def get_chat_locks() -> ChatLockManager:
+    return ChatLockManager()

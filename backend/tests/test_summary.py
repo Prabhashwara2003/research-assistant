@@ -50,7 +50,7 @@ def test_summary_generator_handles_short_and_long_documents(portions):
     )
 
     class FakeStructuredModel:
-        def invoke(self, messages):
+        def invoke(self, messages, config=None):
             assert messages[1][0] == "human"
             if len(portions) == 2:
                 assert "Notes for First section" in messages[1][1]
@@ -63,7 +63,7 @@ def test_summary_generator_handles_short_and_long_documents(portions):
         def __init__(self):
             self.note_calls = 0
 
-        def invoke(self, messages):
+        def invoke(self, messages, config=None):
             self.note_calls += 1
             return SimpleNamespace(content=f"Notes for {portions[self.note_calls - 1]}")
 

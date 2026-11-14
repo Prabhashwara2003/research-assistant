@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from threading import Lock
 
 from langchain_core.documents import Document
@@ -8,6 +7,7 @@ from langchain_core.documents import Document
 from app.ai.pdf_extractor import PDFExtractor
 from app.ai.text_chuncker import TextChunker
 from app.ai.vector_store import VectorStoreManager
+from app.core.exceptions import DocumentIndexError
 
 class IndexRecoveryService:
     def __init__(
@@ -44,40 +44,32 @@ class IndexRecoveryService:
             )
             
             if chunk_path.is_file():
-                records = json.loads(
-                    chunk_path.read_text(
-                        encoding="utf-8"
-                    )
-                )
+                try:
+                    records = json.loads(chunk_path.read_text(encoding="utf-8"))
+                    if not isinstance(records, list):
+                        raise ValueError("Chunk manifest must be a list")
+                except (OSError, ValueError) as error:
+                    raise DocumentIndexError("Invalid chunk manifest") from error
                 
                 chunks = []
                 
-                for record in records:
-                    chunks.append(
-                        Document(
-                            page_content=record["content"],
-                            metadata = record["metadata"]
-                        )
-                    )
+                try:
+                    for record in records:
+                        if not isinstance(record["content"], str) or not isinstance(record["metadata"], dict):
+                            raise ValueError("Invalid chunk record")
+                        chunks.append(Document(page_content=record["content"], metadata=record["metadata"]))
+                except (KeyError, TypeError, ValueError) as error:
+                    raise DocumentIndexError("Invalid chunk manifest") from error
                     
             else:
-                with TemporaryDirectory() as tempory_path:
-                    result = self.extractor.extract(
-                        pdf_path=pdf_path,
-                        document_id=document_id,
-                        output_directory=Path(tempory_path)
-                    )
-                    
-                    chunks = self.chunker.split(
-                        result.documents
-                    )
+                raise DocumentIndexError("Chunk manifest is missing; reprocessing is required")
                     
             if not chunks:
-                raise ValueError(
+                raise DocumentIndexError(
                     "No chunks available to rebuild the index"
                 )
             
-            self.vector_store.index_document(
-                document_id=document_id,
-                chunks=chunks
-            )
+            try:
+                self.vector_store.index_document(document_id=document_id, chunks=chunks)
+            except Exception as error:
+                raise DocumentIndexError("Could not rebuild document index") from error

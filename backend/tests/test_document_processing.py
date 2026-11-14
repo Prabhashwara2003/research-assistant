@@ -133,6 +133,88 @@ class FakeEmbeddings(Embeddings):
         ]
 
 
+@pytest.mark.parametrize("failure_stage", ["extraction", "embedding"])
+def test_processing_failure_preserves_document_and_cleans_temporary_files(
+    tmp_path, failure_stage
+):
+    engine = create_engine(f"sqlite:///{tmp_path / 'failure.db'}")
+    Base.metadata.create_all(bind=engine)
+    TestingSession = sessionmaker(bind=engine, expire_on_commit=False)
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\nTest")
+
+    class FailingExtractor:
+        def extract(self, pdf_path, document_id, output_directory):
+            (output_directory / "temporary.txt").write_text("partial")
+            raise RuntimeError("extraction failed")
+
+    class FailingEmbeddings(FakeEmbeddings):
+        def embed_documents(self, texts):
+            raise RuntimeError("embedding failed")
+
+    with TestingSession() as database:
+        document = DatabaseDocument(id="paper", filename="paper.pdf",
+                                    file_path=str(pdf_path), status="pending")
+        database.add(document)
+        database.commit()
+        store = VectorStoreManager(FailingEmbeddings() if failure_stage == "embedding"
+                                   else FakeEmbeddings())
+        processor = DocumentProcessingService(
+            database=database,
+            extractor=FailingExtractor() if failure_stage == "extraction" else FakeExtractor(),
+            chunker=TextChunker(chunk_size=200, chunk_overlap=30),
+            vector_store=store,
+            extracted_directory=tmp_path / "extracted"
+        )
+        with pytest.raises(RuntimeError, match="failed"):
+            processor.process("paper")
+        database.refresh(document)
+        assert document.status == "failed"
+        assert pdf_path.is_file()
+        assert not store.has_document("paper")
+        assert list((tmp_path / "extracted").iterdir()) == []
+    engine.dispose()
+
+
+def test_processing_database_failure_removes_new_output(tmp_path, monkeypatch):
+    engine = create_engine(f"sqlite:///{tmp_path / 'commit.db'}")
+    Base.metadata.create_all(bind=engine)
+    TestingSession = sessionmaker(bind=engine, expire_on_commit=False)
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\nTest")
+
+    with TestingSession() as database:
+        document = DatabaseDocument(id="paper", filename="paper.pdf",
+                                    file_path=str(pdf_path), status="pending")
+        database.add(document)
+        database.commit()
+        original_commit = database.commit
+        commit_count = 0
+
+        def fail_final_commit():
+            nonlocal commit_count
+            commit_count += 1
+            if commit_count == 2:
+                raise RuntimeError("database commit failed")
+            original_commit()
+
+        monkeypatch.setattr(database, "commit", fail_final_commit)
+        store = VectorStoreManager(FakeEmbeddings())
+        processor = DocumentProcessingService(
+            database=database, extractor=FakeExtractor(),
+            chunker=TextChunker(chunk_size=200, chunk_overlap=30),
+            vector_store=store, extracted_directory=tmp_path / "extracted"
+        )
+        with pytest.raises(RuntimeError, match="database commit failed"):
+            processor.process("paper")
+        database.refresh(document)
+        assert document.status == "failed"
+        assert pdf_path.is_file()
+        assert not (tmp_path / "extracted" / "paper").exists()
+        assert not store.has_document("paper")
+    engine.dispose()
+
+
 def test_document_processing(tmp_path):
 
     database_path = tmp_path / "test.db"

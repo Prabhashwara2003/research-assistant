@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 
 class Settings(BaseSettings):
-   
+
    database_url : str = "sqlite:///./storage/research.db"
    
    anthropic_api_key : str =""
@@ -10,7 +10,9 @@ class Settings(BaseSettings):
    
    langfuse_secret_key :str =""
    langfuse_public_key :str =""
-   langfuse_base_url :str =""
+   langfuse_base_url :str ="https://cloud.langfuse.com"
+
+   langfuse_enabled : bool = False
    
    embedding_model : str="BAAI/bge-small-en-v1.5"
    

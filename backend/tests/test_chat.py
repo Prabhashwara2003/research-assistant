@@ -13,6 +13,7 @@ from app.ai.index_recovery import IndexRecoveryService
 from app.ai.vector_store import VectorStoreManager
 
 from app.services.chat_service import ChatService
+from app.ai.answer_models import GeneratedAnswer
 
 import app.models
 
@@ -56,9 +57,9 @@ class FakeAnswerGenerator:
         retrieved_documents,
         images
     ):
-        return (
-            "The researchers used the CIFAR-10 "
-            "dataset. [Page 4]"
+        return GeneratedAnswer(
+            text="The researchers used the CIFAR-10 dataset. [Page 4]",
+            attached_image_ids=[]
         )
 
 

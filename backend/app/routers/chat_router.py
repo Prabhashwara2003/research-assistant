@@ -25,19 +25,7 @@ def send_message(
     request : ChatRequest,
     service : ChatService = Depends(get_chat_service)
 ):
-    try:
-        response = service.ask_question(
-            document_id=document_id,
-            question = request.question
-        )
-        
-        return response
-    
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error)
-        )
+    return service.ask_question(document_id=document_id, question=request.question)
         
 @router.get(
     "",
@@ -47,12 +35,4 @@ def get_message(
     document_id : str,
     service : ChatService = Depends(get_chat_service)
 ):
-    try:
-        return service.get_chat_history(
-            document_id=document_id
-        )
-    except ValueError as error:
-        raise HTTPException(
-            status_code=404,
-            detail=str(error)
-        )
+    return service.get_chat_history(document_id=document_id)

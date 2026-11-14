@@ -13,6 +13,8 @@ from app.models.document_image import DocumentImage
 
 from app.repositories.image_repository import ImageRepository
 from app.repositories.document_repository import DocumentRepository
+from app.core.observability import Observability
+from app.core.exceptions import DocumentNotFoundError, DocumentNotReadyError
 
 class DocumentProcessingService:
     
@@ -23,7 +25,8 @@ class DocumentProcessingService:
         extractor : PDFExtractor,
         chunker : TextChunker,
         vector_store : VectorStoreManager,
-        extracted_directory : Path
+        extracted_directory : Path,
+        observability: Observability | None = None
         
     ):
         self.database = database
@@ -31,22 +34,27 @@ class DocumentProcessingService:
         self.chunker = chunker
         self.vector_store = vector_store
         self.extracted_directory = extracted_directory
+        self.observability = observability or Observability()
         self.document_repository = DocumentRepository(database)
         self.image_repository = ImageRepository(database)
         
     def process(self,document_id : str )-> int:
+        with self.observability.trace("document-processing", {"document_id": document_id}):
+            return self._process(document_id)
+
+    def _process(self, document_id: str) -> int:
         
         document = self.document_repository.get_by_id(document_id)
         
         if document is None :
-            raise ValueError("Document not found")
+            raise DocumentNotFoundError("Document not found")
         
         claimed = self.document_repository.claim_for_processing(
             document_id
         )
         
         if not claimed :
-            raise ValueError(
+            raise DocumentNotReadyError(
                 "Document cannot be processed in its current state"
             )
         
@@ -57,8 +65,11 @@ class DocumentProcessingService:
         
         final_directory = self.extracted_directory/document_id
         moved_output = False
+        indexed_here = False
         
         try :
+            if final_directory.exists():
+                raise ValueError("Extraction output already exists")
             with TemporaryDirectory(
                 dir=self.extracted_directory
                 
@@ -66,11 +77,12 @@ class DocumentProcessingService:
                 
                 working_directory = Path(temporary_path)
                 
-                result = self.extractor.extract(
-                    pdf_path = Path(document.file_path),
-                    document_id = document_id,
-                    output_directory = working_directory
-                )
+                with self.observability.trace("pdf-extraction", {"document_id": document_id}):
+                    result = self.extractor.extract(
+                        pdf_path = Path(document.file_path),
+                        document_id = document_id,
+                        output_directory = working_directory
+                    )
                 
                 if not result.documents:
                     raise ValueError("No extractable content found")
@@ -107,7 +119,12 @@ class DocumentProcessingService:
                     
                     image_records.append(image_record)
                     
-                chunks = self.chunker.split(result.documents)
+                with self.observability.trace("document-chunking", {
+                    "document_id": document_id,
+                    "content_block_count": len(result.documents),
+                    "image_count": len(result.images)
+                }):
+                    chunks = self.chunker.split(result.documents)
                 
                 chunk_records = []
                 
@@ -133,14 +150,15 @@ class DocumentProcessingService:
                 if not chunks:
                     raise ValueError("No searchable chunks were created")
                 
-                self.vector_store.index_document(
-                    document_id=document_id,
-                    chunks=chunks
-                )
+                with self.observability.trace("document-embedding-and-indexing", {
+                    "document_id": document_id, "chunk_count": len(chunks)
+                }):
+                    self.vector_store.index_document(
+                        document_id=document_id,
+                        chunks=chunks
+                    )
+                indexed_here = True
                     
-                if final_directory.exists():
-                    raise ValueError("Extarction output already exists")
-                
                 working_directory.rename(final_directory)
                 moved_output = True
                 
@@ -156,7 +174,8 @@ class DocumentProcessingService:
             
             self.database.rollback()
             
-            self.vector_store.remove_document(document_id)
+            if indexed_here:
+                self.vector_store.remove_document(document_id)
             
             if moved_output and final_directory.exists():
                 shutil.rmtree(final_directory)

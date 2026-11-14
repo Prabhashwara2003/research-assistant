@@ -12,6 +12,11 @@ from langchain_core.messages import (
 from app.models.message import Message
 from app.models.document_image import DocumentImage
 
+
+from app.core.observability import Observability
+from app.ai.answer_models import GeneratedAnswer
+
+
 ANSWER_INSTRUCTIONS = """
 You are a research paper question-answering assistant.
 
@@ -33,8 +38,9 @@ Rules:
 """
 
 class AnswerGenerator:
-    def __init__(self, model : BaseChatModel):
+    def __init__(self, model : BaseChatModel, observability: Observability | None = None):
         self.model = model
+        self.observability = observability or Observability()
         
     def prepare_search_query(
         self,
@@ -72,7 +78,9 @@ class AnswerGenerator:
                     f"Latest question:\n{question}"
                 )
             )
-        ])
+        ],config={
+            "callbacks": self.observability.get_callbacks()
+        })
         
         rewritten_question = self.response_text(response)
         
@@ -104,7 +112,7 @@ class AnswerGenerator:
         history : list[Message],
         retrieved_documents  :list[Document],
         images : list[DocumentImage]
-    )->str:
+    )->GeneratedAnswer:
         
         evidence_parts = []
         
@@ -156,6 +164,7 @@ class AnswerGenerator:
             }
         ]
         
+        attached_image_ids = []
         for image in images:
             image_path = Path(image.file_path)
 
@@ -190,6 +199,7 @@ class AnswerGenerator:
                     )
                 }
             })
+            attached_image_ids.append(image.image_id)
         
         messages.append(
             HumanMessage(
@@ -197,6 +207,14 @@ class AnswerGenerator:
             )
         )
 
-        response = self.model.invoke(messages)
+        response = self.model.invoke(
+            messages,
+            config = {
+                "callbacks": self.observability.get_callbacks()
+            }
+        )
 
-        return self.response_text(response)
+        return GeneratedAnswer(
+            text=self.response_text(response),
+            attached_image_ids=attached_image_ids
+        )

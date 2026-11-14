@@ -17,6 +17,7 @@ from app.services.document_processing_service import (
 from app.repositories.image_repository import ImageRepository
 from app.schemas.summary_schema import ResearchSummary
 from app.services.summary_service import SummaryService
+from app.core.exceptions import DocumentNotFoundError, DocumentNotReadyError
 
 router = APIRouter(
     prefix="/api/documents",
@@ -109,6 +110,8 @@ def process_document(
             "status" : "indexed",
             "chunk_count" : chunk_count
         }
+    except (DocumentNotFoundError, DocumentNotReadyError):
+        raise
     except ValueError as error:
         raise HTTPException(
             status_code=409,
@@ -172,6 +175,8 @@ def generate_document_summary(
     try:
         return service.generate_summary(document_id)
     
+    except (DocumentNotFoundError, DocumentNotReadyError):
+        raise
     except ValueError as error:
         raise HTTPException(
             status_code=409,
@@ -195,6 +200,8 @@ def get_document_summary(
 ):
     try :
         Summary = service.get_summary(document_id)
+    except DocumentNotFoundError:
+        raise
     except ValueError:
         raise HTTPException(
             status_code=404,
