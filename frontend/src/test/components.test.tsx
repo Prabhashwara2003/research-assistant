@@ -18,6 +18,7 @@ import { getDocument, getMessages, getSummary, sendMessage } from '../services/a
 
 const summary: ResearchSummary = {
   title: 'A Paper About Research', authors: ['Ada', 'Grace'], abstract: 'An abstract',
+  problem_statement: 'Existing methods do not solve this problem.',
   methodology: 'A careful method', key_result: ['First result', 'Second result'], conclusion: 'A conclusion',
 };
 const document: DocumentResponse = { id: 'paper-1', filename: 'paper.pdf', status: 'completed', summary_json: '{}', created_at: '2026-01-01T00:00:00Z' };
@@ -52,6 +53,7 @@ it('renders every summary section with list results', () => {
     expect(screen.getByRole('heading', { name: section })).toBeInTheDocument();
   }
   expect(screen.getByText('First result')).toBeInTheDocument();
+  expect(screen.getByText('Existing methods do not solve this problem.')).toBeInTheDocument();
 });
 
 it('renders source page and image controls only when supplied', async () => {

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -11,6 +12,13 @@ from app.core.exceptions import DocumentNotFoundError, DocumentNotReadyError
 
 
 class SummaryService:
+
+    @staticmethod
+    def _read_saved_summary(summary_json: str) -> ResearchSummary:
+        data = json.loads(summary_json)
+        if "problem_statement" not in data:
+            data["problem_statement"] = "Not available in this saved summary. Upload the paper again to generate one."
+        return ResearchSummary.model_validate(data)
     
     def __init__(
         self,
@@ -40,9 +48,7 @@ class SummaryService:
             raise DocumentNotFoundError("Document not found")
         
         if document.summary_json is not None:
-            return ResearchSummary.model_validate_json(
-                document.summary_json
-            )
+            return self._read_saved_summary(document.summary_json)
             
         if document.status != "indexed":
             raise DocumentNotReadyError("Document must be indexed before summarization")
@@ -89,6 +95,4 @@ class SummaryService:
         if document.summary_json is None:
             return None
         
-        return ResearchSummary.model_validate_json(
-            document.summary_json
-        )
+        return self._read_saved_summary(document.summary_json)

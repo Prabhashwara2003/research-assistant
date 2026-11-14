@@ -11,8 +11,12 @@ class ResearchSummary(BaseModel):
     )
     
     abstract : str = Field(
-        description = "Problem the research addresses"
+        description = "Abstract of the research paper"
     ) 
+
+    problem_statement : str = Field(
+        description="Specific research problem, gap, or limitation addressed by the paper"
+    )
     
     methodology : str = Field(
         description="Research methods and experimental approach"

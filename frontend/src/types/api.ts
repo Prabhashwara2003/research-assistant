@@ -12,11 +12,11 @@ export interface ProcessResponse {
   chunk_count: number;
 }
 
-// ResearchSummary has no dedicated problem_statement field in the backend.
 export interface ResearchSummary {
   title: string;
   authors: string[];
   abstract: string;
+  problem_statement: string;
   methodology: string;
   key_result: string[];
   conclusion: string;

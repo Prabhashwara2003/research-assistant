@@ -27,6 +27,7 @@ class FakeSummaryGenerator:
             title="Machine Learning Research",
             authors=["John Smith", "Jane Doe"],
             abstract="A study about machine learning.",
+            problem_statement="Existing methods do not address this research problem.",
             methodology="Experimental evaluation.",
             key_result=[
                 "The proposed model showed improvements."
@@ -44,6 +45,7 @@ def test_summary_generator_handles_short_and_long_documents(portions):
         title="Research Paper",
         authors=["Jane Doe"],
         abstract="Research problem",
+        problem_statement="Existing approaches leave a research gap.",
         methodology="Experiment",
         key_result=["Result"],
         conclusion="Conclusion",
@@ -148,6 +150,7 @@ def test_summary_generation(tmp_path):
 
         assert saved_summary is not None
         assert saved_summary.title == summary.title
+        assert saved_summary.problem_statement == summary.problem_statement
 
         # Generating again should reuse SQLite data.
         second_summary = service.generate_summary(
@@ -155,6 +158,22 @@ def test_summary_generation(tmp_path):
         )
 
         assert second_summary.title == summary.title
+        assert fake_generator.call_count == 1
+
+        # Older saved summaries remain readable without inventing a statement.
+        legacy_document = Document(
+            id="legacy-paper",
+            filename="legacy.pdf",
+            file_path=str(tmp_path / "legacy.pdf"),
+            status="completed",
+            summary_json=summary.model_dump_json(exclude={"problem_statement"}),
+        )
+        database.add(legacy_document)
+        database.commit()
+        legacy_summary = service.get_summary(legacy_document.id)
+        assert legacy_summary is not None
+        assert legacy_summary.problem_statement.startswith("Not available")
+        assert service.generate_summary(legacy_document.id) == legacy_summary
         assert fake_generator.call_count == 1
 
     engine.dispose()

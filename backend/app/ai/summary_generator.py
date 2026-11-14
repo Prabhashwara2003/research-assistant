@@ -16,6 +16,7 @@ research paper content.
 Requirements:
 - Do not invent information.
 - Preserve important technical details.
+- State the paper's research problem or gap separately from its abstract.
 - Identify the actual methodology and results.
 - Do not treat references to other papers as findings
   of the current paper.
@@ -68,6 +69,7 @@ class SummaryGenerator :
                         "Extract factual research notes from "
                         "this portion of a paper. Include "
                         "important title/author details, "
+                        "the research problem or gap, "
                         "methodology, results and conclusions "
                         "when present. Do not invent missing "
                         "information.\n\n"
